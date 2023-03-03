@@ -1,2 +1,2 @@
 # enum-serialization
-Example of JSON serialization for Scala enumerations
+Examples of JSON serialization for Scala enumerations
