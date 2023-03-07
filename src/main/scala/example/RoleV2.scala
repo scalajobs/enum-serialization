@@ -1,73 +1,68 @@
 package example
 
 import cats.implicits.*
-import io.circe.syntax.*
-import io.circe.{Decoder, DecodingFailure, Encoder, Json}
 import io.circe.DecodingFailure.Reason.CustomReason
+import io.circe.syntax.*
+import io.circe.*
 
+// manual codec with strict admin decoder
 enum RoleV2 {
-  def email: String
-
-  case Reader(email: String, subscription: SubscriptionV1)
-  case Editor(email: String, favoriteFont: String)
-  case Admin(email: String)
+  case Reader(subscription: SubscriptionV1)
+  case Editor(profileBio: String, favoriteFont: String)
+  case Admin
 }
 
 object RoleV2 {
-  given Encoder[RoleV2] =
-    Encoder.instance {
-      case Reader(email, subscription) =>
-        Json.obj(
-          "type" -> "READER".asJson,
-          "email" -> email.asJson,
-          "subscription"   -> subscription.asJson,
-        )
-      case Editor(email, favoriteFont) =>
-        Json.obj(
-          "type" -> "EDITOR".asJson,
-          "email" -> email.asJson,
-          "favoriteFont"   -> favoriteFont.asJson,
-        )
-      case Admin(email) =>
-        Json.obj(
-          "type" -> "ADMIN".asJson,
-          "email" -> email.asJson,
-        )
+  given readerEncoder: Encoder[Reader] =
+    Encoder.instance { reader =>
+      Json.obj("subscription" -> reader.subscription.asJson)
     }
 
+  given editorEncoder: Encoder[Editor] =
+    Encoder.instance { editor =>
+      Json.obj(
+        "profileBio"     -> editor.profileBio.asJson,
+        "favoriteFont"   -> editor.favoriteFont.asJson,
+      )
+    }
+
+  given adminEncoder: Encoder[Admin.type] =
+    Encoder.instance { admin => Json.obj() }
+
+  given Encoder[RoleV2] =
+    Encoder.instance {
+      case x: Reader => readerEncoder(x)
+      case x: Editor => editorEncoder(x)
+      case Admin     => adminEncoder(Admin)
+    }
+  
   given readerDecoder: Decoder[Reader] =
     Decoder.instance(cursor =>
       for {
-        email        <- cursor.downField("email").as[String]
         subscription <- cursor.downField("subscription").as[SubscriptionV1]
-      } yield Reader(email, subscription)
+      } yield Reader(subscription)
     )
 
   given editorDecoder: Decoder[Editor] =
     Decoder.instance(cursor =>
       for {
-        email        <- cursor.downField("email").as[String]
+        profileBio   <- cursor.downField("profileBio").as[String]
         favoriteFont <- cursor.downField("favoriteFont").as[String]
-      } yield Editor(email, favoriteFont)
+      } yield Editor(profileBio, favoriteFont)
     )
-    
-  given adminDecoder: Decoder[Admin] =
+
+  given adminDecoder: Decoder[Admin.type] =
     Decoder.instance(cursor =>
       for {
-        email <- cursor.downField("email").as[String]
-      } yield Admin(email)
+        obj <- cursor.as[JsonObject]
+        _ <- if(obj.isEmpty) Right(Admin)
+             else Left(DecodingFailure(CustomReason(s"$obj is not a valid Admin"), cursor))
+      } yield Admin
     )
 
   given Decoder[RoleV2] =
-    Decoder.instance(cursor =>
-      for {
-        discriminator <- cursor.downField("type").as[String]
-        role <- discriminator match
-          case "READER" => readerDecoder(cursor)
-          case "EDITOR" => editorDecoder(cursor)
-          case "ADMIN"  => adminDecoder(cursor)
-          case other    => Left(DecodingFailure(CustomReason(s"invalid role type $other"), cursor.downField("type")))
-      } yield role
-    )
+    readerDecoder.widen[RoleV2]
+      .or(editorDecoder.widen[RoleV2])
+      .or(adminDecoder.widen[RoleV2])
 
 }

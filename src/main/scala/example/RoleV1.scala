@@ -1,9 +1,11 @@
 package example
 
 import cats.implicits.*
-import io.circe.{Decoder, Encoder, Json, JsonObject}
+import io.circe.DecodingFailure.Reason.CustomReason
+import io.circe.{Decoder, DecodingFailure, Encoder, Json, JsonObject}
 import io.circe.syntax.*
 
+// manual codec with permissive admin decoder
 enum RoleV1 {
   case Reader(subscription: SubscriptionV1)
   case Editor(profileBio: String, favoriteFont: String)

@@ -17,7 +17,7 @@ class RoleV1Spec extends munit.FunSuite {
     val result1 = decode[RoleV1]("""{"subscription":"FREE"}""")
     val result2 = decode[RoleV1]("""{"profileBio":"foo","favoriteFont":"Comic Sans"}""")
     val result3 = decode[RoleV1]("""{}""")
-    val result4 = decode[RoleV1]("""{"firstName":"john"}""")
+    val result4 = decode[RoleV1]("""{"subscription":"GENESIS"}""")
 
     assertEquals(result1, Right(Reader(Free)))
     assertEquals(result2, Right(Editor("foo","Comic Sans")))
